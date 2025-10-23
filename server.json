@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.Pranavj17/mcp-server-graylog",
+  "version": "1.0.1",
+  "description": "Search Graylog logs by timestamps, filter by streams, and debug production issues.",
+  "homepage": "https://github.com/Pranavj17/mcp-server-graylog",
+  "licenseId": "MIT",
+  "sourceUrl": "https://github.com/Pranavj17/mcp-server-graylog",
+  "runtime": {
+    "type": "node",
+    "package": "mcp-server-graylog"
+  },
+  "vendor": {
+    "name": "Pranav",
+    "url": "https://github.com/Pranavj17"
+  },
+  "tools": [
+    {
+      "name": "search_logs_absolute",
+      "description": "Search Graylog logs using absolute timestamps (from/to). Perfect for debugging errors with specific timestamps from monitoring tools."
+    },
+    {
+      "name": "search_logs_relative",
+      "description": "Search Graylog logs using relative time range (e.g., last 15 minutes). Useful for recent log analysis."
+    },
+    {
+      "name": "list_streams",
+      "description": "List all available Graylog streams (applications). Use this to discover stream IDs for filtering."
+    },
+    {
+      "name": "get_system_info",
+      "description": "Get Graylog system information and health status. Use this to verify connectivity."
+    }
+  ],
+  "keywords": [
+    "graylog",
+    "logging",
+    "log-search",
+    "debugging",
+    "elasticsearch",
+    "production-debugging",
+    "observability",
+    "error-tracking"
+  ]
+}
