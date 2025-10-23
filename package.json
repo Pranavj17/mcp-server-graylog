@@ -28,6 +28,6 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://code.scripbox.io/pranav/graylog-mcp.git"
+        "url": "https://github.com/pranav/graylog-mcp.git"
     }
 }
