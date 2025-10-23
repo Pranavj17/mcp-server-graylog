@@ -172,8 +172,8 @@ List all available Graylog streams (applications). Use this to discover stream I
   "streams": [
     {
       "id": "646221a5bd29672a6f0246d8",
-      "title": "clientmaster",
-      "description": "Client Master application logs",
+      "title": "application-api",
+      "description": "API application logs",
       "disabled": false
     }
   ]

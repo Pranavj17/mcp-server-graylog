@@ -177,7 +177,7 @@ describe('MCP Response Format', () => {
                 {
                     timestamp: '2025-10-23T10:45:00Z',
                     message: 'Another error',
-                    source: 'clientmaster',
+                    source: 'application-api',
                     level: 'ERROR'
                 }
             ]
@@ -195,8 +195,8 @@ describe('MCP Response Format', () => {
             streams: [
                 {
                     id: '646221a5bd29672a6f0246d8',
-                    title: 'clientmaster',
-                    description: 'Client Master logs',
+                    title: 'application-api',
+                    description: 'API application logs',
                     disabled: false
                 },
                 {
