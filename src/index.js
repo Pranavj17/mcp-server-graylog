@@ -115,7 +115,7 @@ async function graylogRequest(endpoint, params = {}) {
 
 const server = new Server({
     name: "graylog-mcp",
-    version: "2.0.0",
+    version: "1.0.0",
 }, {
     capabilities: {
         tools: {},

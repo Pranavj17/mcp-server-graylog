@@ -1,6 +1,6 @@
 {
     "name": "mcp-server-graylog",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "description": "Model Context Protocol (MCP) server for Graylog log searching. Search logs by absolute/relative timestamps, filter by streams, and debug production issues.",
     "main": "src/index.js",
     "type": "module",
