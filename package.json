@@ -46,10 +46,10 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/Pranavj17/graylog-mcp.git"
+        "url": "https://github.com/Pranavj17/mcp-server-graylog.git"
     },
     "bugs": {
-        "url": "https://github.com/Pranavj17/graylog-mcp/issues"
+        "url": "https://github.com/Pranavj17/mcp-server-graylog/issues"
     },
-    "homepage": "https://github.com/Pranavj17/graylog-mcp#readme"
+    "homepage": "https://github.com/Pranavj17/mcp-server-graylog#readme"
 }

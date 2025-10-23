@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/mcp-server-graylog.svg)](https://www.npmjs.com/package/mcp-server-graylog)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-54%20passing-brightgreen)](https://github.com/Pranavj17/graylog-mcp)
+[![Tests](https://img.shields.io/badge/tests-54%20passing-brightgreen)](https://github.com/Pranavj17/mcp-server-graylog)
 
 Model Context Protocol (MCP) server for Graylog log searching. Search logs by absolute/relative timestamps, filter by streams, and debug production issues directly from Claude Desktop.
 
@@ -50,8 +50,8 @@ npm install -g mcp-server-graylog
 
 ```bash
 # Clone the repository
-git clone https://github.com/Pranavj17/graylog-mcp.git
-cd graylog-mcp
+git clone https://github.com/Pranavj17/mcp-server-graylog.git
+cd mcp-server-graylog
 
 # Install dependencies
 npm install
@@ -454,8 +454,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Links
 
 - [npm package](https://www.npmjs.com/package/mcp-server-graylog)
-- [GitHub repository](https://github.com/Pranavj17/graylog-mcp)
-- [Issue tracker](https://github.com/Pranavj17/graylog-mcp/issues)
+- [GitHub repository](https://github.com/Pranavj17/mcp-server-graylog)
+- [Issue tracker](https://github.com/Pranavj17/mcp-server-graylog/issues)
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [Graylog Documentation](https://docs.graylog.org)
 
