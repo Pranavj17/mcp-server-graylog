@@ -31,9 +31,9 @@
         "log-search",
         "debugging",
         "elasticsearch",
-        "sentry",
         "production-debugging",
-        "observability"
+        "observability",
+        "error-tracking"
     ],
     "author": "Pranav <https://github.com/Pranavj17>",
     "license": "MIT",

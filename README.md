@@ -7,7 +7,7 @@
 
 Model Context Protocol (MCP) server for Graylog log searching. Search logs by absolute/relative timestamps, filter by streams, and debug production issues directly from Claude Desktop.
 
-> **Built for production debugging** - Search Graylog logs using exact timestamps from Sentry errors, filter by application streams, and get actionable insights.
+> **Built for production debugging** - Search Graylog logs using exact timestamps, filter by application streams, and get actionable insights for troubleshooting production issues.
 
 ## Features
 
@@ -120,7 +120,7 @@ Add to your Claude Desktop config file:
 
 ### 1. search_logs_absolute
 
-Search logs using absolute timestamps (from/to). Perfect for debugging errors with specific timestamps from Sentry or other monitoring tools.
+Search logs using absolute timestamps (from/to). Perfect for debugging errors with specific timestamps from monitoring tools or error tracking systems.
 
 **Parameters:**
 - `query` (required): Search query using Elasticsearch syntax
@@ -256,12 +256,12 @@ _exists_:error_code
 
 ## Common Use Cases
 
-### 1. Debug Sentry Error
+### 1. Debug Production Error
 
-When you get a Sentry error with a timestamp:
+When you get an error with a timestamp from your monitoring system:
 
 ```
-1. Copy error timestamp from Sentry
+1. Copy error timestamp from your monitoring tool
 2. Use search_logs_absolute with ±5 minute window
 3. Filter by application stream
 4. Find root cause in logs
