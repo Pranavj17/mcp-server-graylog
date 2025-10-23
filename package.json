@@ -1,23 +1,41 @@
 {
-    "name": "graylog-mcp",
+    "name": "mcp-server-graylog",
     "version": "2.0.0",
-    "description": "Simple, focused MCP server for Graylog log searching. Built for debugging production issues.",
+    "description": "Model Context Protocol (MCP) server for Graylog log searching. Search logs by absolute/relative timestamps, filter by streams, and debug production issues.",
     "main": "src/index.js",
     "type": "module",
+    "bin": {
+        "mcp-server-graylog": "src/index.js"
+    },
+    "files": [
+        "src/",
+        "example-config.json",
+        "LICENSE",
+        "README.md",
+        "CHANGELOG.md"
+    ],
     "scripts": {
         "start": "node src/index.js",
         "dev": "node --watch src/index.js",
-        "test": "node --check src/index.js"
+        "test": "node --test test/*.test.js",
+        "test:unit": "node --test test/helpers.test.js test/validation.test.js test/mcp-protocol.test.js",
+        "test:integration": "INTEGRATION_TESTS=true node --test test/integration.test.js",
+        "test:watch": "node --test --watch test/*.test.js",
+        "lint": "node --check src/index.js"
     },
     "keywords": [
         "mcp",
+        "model-context-protocol",
         "graylog",
         "logging",
-        "model-context-protocol",
+        "log-search",
         "debugging",
-        "log-search"
+        "elasticsearch",
+        "sentry",
+        "production-debugging",
+        "observability"
     ],
-    "author": "Pranav",
+    "author": "Pranav <https://github.com/Pranavj17>",
     "license": "MIT",
     "dependencies": {
         "@modelcontextprotocol/sdk": "^1.0.0",
@@ -29,5 +47,9 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/Pranavj17/graylog-mcp.git"
-    }
+    },
+    "bugs": {
+        "url": "https://github.com/Pranavj17/graylog-mcp/issues"
+    },
+    "homepage": "https://github.com/Pranavj17/graylog-mcp#readme"
 }
