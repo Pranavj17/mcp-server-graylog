@@ -1,19 +1,21 @@
 /**
  * Validation tests for input parameters
- * Tests the bug fixes for query, streamId, rangeSeconds, and limit validation
+ * Tests the bug fixes for query, streamId, rangeSeconds, limit, and message formatting
+ *
+ * Now imports the REAL functions from src/helpers.js instead of testing copies.
  */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import {
+    validateQuery,
+    validateStreamId,
+    validateRangeSeconds,
+    validateLimit,
+    formatMessages
+} from '../src/helpers.js';
 
 describe('Query Validation (Bug #4 Fix)', () => {
-    const validateQuery = (query) => {
-        if (!query || typeof query !== 'string' || !query.trim()) {
-            throw new Error("'query' parameter is required and must be a non-empty string");
-        }
-        return query.trim();
-    };
-
     it('should accept valid queries', () => {
         assert.strictEqual(validateQuery('level:ERROR'), 'level:ERROR');
         assert.strictEqual(validateQuery('  /api/v1/registrations  '), '/api/v1/registrations');
@@ -60,13 +62,6 @@ describe('Query Validation (Bug #4 Fix)', () => {
 });
 
 describe('StreamId Validation (Bug #3 Fix)', () => {
-    const validateStreamId = (streamId) => {
-        if (streamId !== undefined && typeof streamId !== 'string') {
-            throw new Error("'streamId' must be a string");
-        }
-        return streamId;
-    };
-
     it('should accept valid stream IDs', () => {
         assert.strictEqual(validateStreamId('646221a5bd29672a6f0246d8'), '646221a5bd29672a6f0246d8');
         assert.strictEqual(validateStreamId('67fc9a38d7e1b33fa7695220'), '67fc9a38d7e1b33fa7695220');
@@ -96,13 +91,6 @@ describe('StreamId Validation (Bug #3 Fix)', () => {
 });
 
 describe('RangeSeconds Validation (Bug #2 Fix)', () => {
-    const validateRangeSeconds = (rangeSeconds) => {
-        if (rangeSeconds < 1 || rangeSeconds > 86400) {
-            throw new Error("'rangeSeconds' must be between 1 and 86400 (24 hours)");
-        }
-        return rangeSeconds;
-    };
-
     it('should accept valid range values', () => {
         assert.strictEqual(validateRangeSeconds(1), 1); // 1 second
         assert.strictEqual(validateRangeSeconds(900), 900); // 15 minutes (default)
@@ -132,14 +120,6 @@ describe('RangeSeconds Validation (Bug #2 Fix)', () => {
 });
 
 describe('Limit Validation (Bug #5 Fix)', () => {
-    const validateLimit = (limit) => {
-        const actualLimit = limit ?? 50; // Nullish coalescing
-        if (actualLimit < 1 || actualLimit > 1000) {
-            throw new Error("'limit' must be between 1 and 1000");
-        }
-        return actualLimit;
-    };
-
     it('should accept valid limit values', () => {
         assert.strictEqual(validateLimit(1), 1);
         assert.strictEqual(validateLimit(50), 50);
@@ -175,17 +155,6 @@ describe('Limit Validation (Bug #5 Fix)', () => {
 });
 
 describe('Message Field Access (Bug #1 Fix)', () => {
-    const formatMessages = (messages) => {
-        return (messages || [])
-            .filter(m => m && m.message)
-            .map(m => ({
-                timestamp: m.message.timestamp,
-                message: m.message.message,
-                source: m.message.source,
-                level: m.message.level
-            }));
-    };
-
     it('should handle valid message array', () => {
         const messages = [
             {

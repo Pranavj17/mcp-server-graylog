@@ -50,6 +50,9 @@ jspm_packages/
 .env.production
 .env.local
 
+# MCP Registry auth tokens (NEVER commit these)
+.mcpregistry_*
+
 # parcel-bundler cache
 .cache
 .parcel-cache

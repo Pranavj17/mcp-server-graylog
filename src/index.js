@@ -12,6 +12,16 @@ import {
     ListToolsRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import axios from "axios";
+import {
+    isValidISO8601,
+    validateTimeRange,
+    validateQuery,
+    validateStreamId,
+    validateRangeSeconds,
+    validateLimit,
+    formatError,
+    formatMessages
+} from "./helpers.js";
 
 // ============================================================================
 // CONFIGURATION & VALIDATION
@@ -39,54 +49,8 @@ function validateEnvironment() {
 }
 
 // ============================================================================
-// HELPER FUNCTIONS
+// HTTP CLIENT
 // ============================================================================
-
-function isValidISO8601(dateString) {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date) && dateString.includes('T');
-}
-
-function validateTimeRange(from, to) {
-    if (!isValidISO8601(from)) {
-        throw new Error(`Invalid 'from' timestamp. Use ISO 8601 format (e.g., '2025-09-29T17:57:26.568Z')`);
-    }
-    if (!isValidISO8601(to)) {
-        throw new Error(`Invalid 'to' timestamp. Use ISO 8601 format (e.g., '2025-09-30T12:36:20.910Z')`);
-    }
-
-    const fromDate = new Date(from);
-    const toDate = new Date(to);
-
-    if (fromDate >= toDate) {
-        throw new Error(`'from' timestamp must be before 'to' timestamp`);
-    }
-}
-
-function formatError(error) {
-    if (error.response) {
-        const status = error.response.status;
-        const data = error.response.data;
-
-        switch (status) {
-            case 401:
-                return 'Authentication failed. Check API_TOKEN in MCP configuration.';
-            case 400:
-                return `Invalid query: ${data?.message || 'Check query syntax and parameters'}`;
-            case 404:
-                return `Endpoint not found. Check BASE_URL in MCP configuration.`;
-            case 500:
-                return `Graylog server error: ${data?.message || error.message}`;
-            default:
-                return `Graylog API error (${status}): ${data?.message || error.message}`;
-        }
-    } else if (error.request) {
-        return `Cannot reach Graylog at ${CONFIG.baseUrl}. Check network connectivity.`;
-    } else {
-        return error.message;
-    }
-}
 
 async function graylogRequest(endpoint, params = {}) {
     try {
@@ -105,7 +69,7 @@ async function graylogRequest(endpoint, params = {}) {
             status: error.response?.status,
             message: error.message
         });
-        throw new Error(formatError(error));
+        throw new Error(formatError(error, CONFIG.baseUrl));
     }
 }
 
@@ -248,28 +212,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // ============================================================================
 
 async function searchLogsAbsolute(args) {
-    // Use nullish coalescing for proper default handling (Bug #5 fix)
-    const { query, from, to, streamId } = args;
-    const limit = args.limit ?? 50;
-
-    // Validate inputs (Bug #4 fix: type check before trim)
-    if (!query || typeof query !== 'string' || !query.trim()) {
-        throw new Error("'query' parameter is required and must be a non-empty string");
-    }
+    const { from, to, streamId } = args;
+    const query = validateQuery(args.query);
+    const limit = validateLimit(args.limit);
     validateTimeRange(from, to);
-
-    // Bug #3 fix: validate streamId type
-    if (streamId !== undefined && typeof streamId !== 'string') {
-        throw new Error("'streamId' must be a string");
-    }
-
-    if (limit < 1 || limit > 1000) {
-        throw new Error("'limit' must be between 1 and 1000");
-    }
+    validateStreamId(streamId);
 
     // Build request parameters
     const params = {
-        query: query.trim(),
+        query,
         from: from.trim(),
         to: to.trim(),
         limit,
@@ -283,19 +234,12 @@ async function searchLogsAbsolute(args) {
     // Execute search
     const data = await graylogRequest('/api/search/universal/absolute', params);
 
-    // Format response (Bug #1 fix: filter out malformed messages)
+    // Format response
     const result = {
         total_results: data.total_results || 0,
         query: data.built_query,
         time_range: { from, to },
-        messages: (data.messages || [])
-            .filter(m => m && m.message)
-            .map(m => ({
-                timestamp: m.message.timestamp,
-                message: m.message.message,
-                source: m.message.source,
-                level: m.message.level
-            }))
+        messages: formatMessages(data.messages)
     };
 
     return {
@@ -307,33 +251,15 @@ async function searchLogsAbsolute(args) {
 }
 
 async function searchLogsRelative(args) {
-    // Use nullish coalescing for proper default handling (Bug #5 fix)
-    const { query, streamId } = args;
-    const rangeSeconds = args.rangeSeconds ?? 900;
-    const limit = args.limit ?? 50;
-
-    // Validate inputs (Bug #4 fix: type check before trim)
-    if (!query || typeof query !== 'string' || !query.trim()) {
-        throw new Error("'query' parameter is required and must be a non-empty string");
-    }
-
-    // Bug #2 fix: validate rangeSeconds
-    if (rangeSeconds < 1 || rangeSeconds > 86400) {
-        throw new Error("'rangeSeconds' must be between 1 and 86400 (24 hours)");
-    }
-
-    // Bug #3 fix: validate streamId type
-    if (streamId !== undefined && typeof streamId !== 'string') {
-        throw new Error("'streamId' must be a string");
-    }
-
-    if (limit < 1 || limit > 1000) {
-        throw new Error("'limit' must be between 1 and 1000");
-    }
+    const { streamId } = args;
+    const query = validateQuery(args.query);
+    const rangeSeconds = validateRangeSeconds(args.rangeSeconds ?? 900);
+    const limit = validateLimit(args.limit);
+    validateStreamId(streamId);
 
     // Build request parameters
     const params = {
-        query: query.trim(),
+        query,
         range: rangeSeconds,
         limit,
         fields: 'message,timestamp,source,level'
@@ -346,19 +272,12 @@ async function searchLogsRelative(args) {
     // Execute search
     const data = await graylogRequest('/api/search/universal/relative', params);
 
-    // Format response (Bug #1 fix: filter out malformed messages)
+    // Format response
     const result = {
         total_results: data.total_results || 0,
         query: data.built_query,
         time_range: `Last ${rangeSeconds} seconds`,
-        messages: (data.messages || [])
-            .filter(m => m && m.message)
-            .map(m => ({
-                timestamp: m.message.timestamp,
-                message: m.message.message,
-                source: m.message.source,
-                level: m.message.level
-            }))
+        messages: formatMessages(data.messages)
     };
 
     return {

@@ -1,22 +1,19 @@
 /**
  * Unit tests for helper functions
  * Tests ISO 8601 validation, time range validation, and error formatting
+ *
+ * Now imports the REAL functions from src/helpers.js instead of testing copies.
  */
 
-import { describe, it, before } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
-
-// Mock the helper functions by importing them
-// Since index.js doesn't export them, we'll need to test through the MCP interface
-// For now, we'll create a test helper module
+import {
+    isValidISO8601,
+    validateTimeRange,
+    formatError
+} from '../src/helpers.js';
 
 describe('ISO 8601 Validation', () => {
-    const isValidISO8601 = (dateString) => {
-        if (!dateString) return false;
-        const date = new Date(dateString);
-        return date instanceof Date && !isNaN(date) && dateString.includes('T');
-    };
-
     it('should accept valid ISO 8601 timestamps', () => {
         assert.strictEqual(isValidISO8601('2025-09-29T17:57:26.568Z'), true);
         assert.strictEqual(isValidISO8601('2025-10-23T12:00:00.000Z'), true);
@@ -42,28 +39,6 @@ describe('ISO 8601 Validation', () => {
 });
 
 describe('Time Range Validation', () => {
-    const isValidISO8601 = (dateString) => {
-        if (!dateString) return false;
-        const date = new Date(dateString);
-        return date instanceof Date && !isNaN(date) && dateString.includes('T');
-    };
-
-    const validateTimeRange = (from, to) => {
-        if (!isValidISO8601(from)) {
-            throw new Error(`Invalid 'from' timestamp. Use ISO 8601 format (e.g., '2025-09-29T17:57:26.568Z')`);
-        }
-        if (!isValidISO8601(to)) {
-            throw new Error(`Invalid 'to' timestamp. Use ISO 8601 format (e.g., '2025-09-30T12:36:20.910Z')`);
-        }
-
-        const fromDate = new Date(from);
-        const toDate = new Date(to);
-
-        if (fromDate >= toDate) {
-            throw new Error(`'from' timestamp must be before 'to' timestamp`);
-        }
-    };
-
     it('should accept valid time ranges', () => {
         assert.doesNotThrow(() => {
             validateTimeRange('2025-09-29T17:57:26.568Z', '2025-09-30T12:36:20.910Z');
@@ -96,37 +71,13 @@ describe('Time Range Validation', () => {
 });
 
 describe('Error Formatting', () => {
-    const formatError = (error) => {
-        if (error.response) {
-            const status = error.response.status;
-            const data = error.response.data;
-
-            switch (status) {
-                case 401:
-                    return 'Authentication failed. Check API_TOKEN in MCP configuration.';
-                case 400:
-                    return `Invalid query: ${data?.message || 'Check query syntax and parameters'}`;
-                case 404:
-                    return `Endpoint not found. Check BASE_URL in MCP configuration.`;
-                case 500:
-                    return `Graylog server error: ${data?.message || error.message}`;
-                default:
-                    return `Graylog API error (${status}): ${data?.message || error.message}`;
-            }
-        } else if (error.request) {
-            return `Cannot reach Graylog at undefined. Check network connectivity.`;
-        } else {
-            return error.message;
-        }
-    };
-
     it('should format 401 authentication errors', () => {
         const error = {
             response: { status: 401, data: {} },
             message: 'Unauthorized'
         };
         assert.strictEqual(
-            formatError(error),
+            formatError(error, 'https://graylog.example.com'),
             'Authentication failed. Check API_TOKEN in MCP configuration.'
         );
     });
@@ -137,7 +88,7 @@ describe('Error Formatting', () => {
             message: 'Bad Request'
         };
         assert.strictEqual(
-            formatError(error),
+            formatError(error, 'https://graylog.example.com'),
             'Invalid query: Invalid syntax'
         );
     });
@@ -148,7 +99,7 @@ describe('Error Formatting', () => {
             message: 'Not Found'
         };
         assert.strictEqual(
-            formatError(error),
+            formatError(error, 'https://graylog.example.com'),
             'Endpoint not found. Check BASE_URL in MCP configuration.'
         );
     });
@@ -159,7 +110,7 @@ describe('Error Formatting', () => {
             message: 'Server Error'
         };
         assert.strictEqual(
-            formatError(error),
+            formatError(error, 'https://graylog.example.com'),
             'Graylog server error: Internal error'
         );
     });
@@ -169,9 +120,9 @@ describe('Error Formatting', () => {
             request: {},
             message: 'Network Error'
         };
-        assert.match(
-            formatError(error),
-            /Cannot reach Graylog/
+        assert.strictEqual(
+            formatError(error, 'https://graylog.example.com'),
+            'Cannot reach Graylog at https://graylog.example.com. Check network connectivity.'
         );
     });
 
@@ -180,7 +131,7 @@ describe('Error Formatting', () => {
             message: 'Something went wrong'
         };
         assert.strictEqual(
-            formatError(error),
+            formatError(error, 'https://graylog.example.com'),
             'Something went wrong'
         );
     });

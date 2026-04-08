@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-04-08
+
+### Changed
+- Extract shared helpers into `src/helpers.js` — tests now import real production code instead of copy-pasted duplicates
+- `formatError` takes explicit `baseUrl` parameter (pure function, easier to test)
+- Tool functions use extracted validators (`validateQuery`, `validateStreamId`, `validateRangeSeconds`, `validateLimit`, `formatMessages`)
+
+### Fixed
+- **CRITICAL**: Remove leaked MCP Registry credentials from git tracking
+- Add `.mcpregistry_*` to `.gitignore`
+
+### Added
+- `src/helpers.js` — 8 exported validation and formatting functions
+- `server.json` included in npm package files
+
 ## [1.0.0] - 2025-10-23
 
 **First stable public release!**
