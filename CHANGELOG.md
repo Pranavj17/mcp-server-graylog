@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-04-27
+
+### Breaking Changes
+- `formatMessages()` now returns ALL fields from Graylog messages (filtering out `gl2_*` internals) instead of only `{timestamp, message, source, level}`. Consumers relying on the exact 4-field shape need to update.
+- Default `fields` parameter changed from `message,timestamp,source,level` to include `logger_level,trace_id,span_id,pod,service,container_name`. Pass explicit `fields` to restore old behavior.
+
+### Added
+- **`trace_request` tool** — Trace a request across ALL services using a `trace_id`. Groups results by service, sorts by timestamp. Essential for distributed debugging in microservice architectures.
+- **`get_surrounding_logs` tool** — Get logs within +-N seconds of a timestamp, optionally filtered by source/pod/stream. Reveals what happened immediately before and after an error.
+- **`fields` parameter** on `search_logs_absolute` and `search_logs_relative` — Specify which fields to return. Use `'*'` for all fields. Default now includes tracing fields (`trace_id`, `span_id`, `pod`, `service`, `container_name`).
+- `DEFAULT_FIELDS` exported constant in `helpers.js` for consistent field defaults.
+
+### Changed
+- `formatMessages()` passes through all non-internal fields instead of cherry-picking 4. Internal fields (`gl2_*`) are stripped to reduce noise.
+- Server version bumped to 2.0.0
+- Tool descriptions updated with distributed tracing examples (`trace_id:abc123`, `logger_level:error`)
+
+### Fixed
+- Distributed tracing was impossible — `trace_id`, `span_id`, `pod`, `service`, `container_name` were silently dropped by `formatMessages()`
+- `logger_level` field (used by many apps instead of `level`) was not returned
+
 ## [1.0.3] - 2026-04-08
 
 ### Changed
@@ -85,13 +106,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Future Releases
 
 ### [2.1.0] - Planned
+- `aggregate_logs` tool — Count/group logs by service, level, pod
+- `list_fields` tool — Discover available fields in a stream
 - GitHub Actions CI/CD pipeline
 - TypeScript type definitions (.d.ts)
-- Additional query examples
-- Performance optimizations
 
 ### [3.0.0] - Planned
-- GraphQL query support
-- Streaming logs support
-- Advanced filtering options
+- Streaming logs support (WebSocket/SSE)
+- Advanced filtering with saved searches
 - Dashboard integration
+- Alert query support

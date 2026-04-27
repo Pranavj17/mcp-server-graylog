@@ -91,13 +91,27 @@ export function formatError(error, baseUrl) {
 }
 
 export function formatMessages(messages) {
-    // Bug #1 fix: filter out malformed messages before accessing nested fields
+    // v2.0: Pass through all fields from Graylog instead of cherry-picking 4.
+    // This enables distributed tracing (trace_id, span_id), pod identification,
+    // service correlation, and logger_level filtering.
     return (messages || [])
         .filter(m => m && m.message)
-        .map(m => ({
-            timestamp: m.message.timestamp,
-            message: m.message.message,
-            source: m.message.source,
-            level: m.message.level
-        }));
+        .map(m => {
+            const msg = m.message;
+            // Remove Graylog internal fields (start with gl2_) to reduce noise
+            const result = {};
+            for (const [key, value] of Object.entries(msg)) {
+                if (!key.startsWith('gl2_')) {
+                    result[key] = value;
+                }
+            }
+            return result;
+        });
 }
+
+// Default fields that cover most debugging scenarios.
+// Users can override via the `fields` parameter on search tools.
+export const DEFAULT_FIELDS = [
+    'message', 'timestamp', 'source', 'level', 'logger_level',
+    'trace_id', 'span_id', 'pod', 'service', 'container_name'
+].join(',');

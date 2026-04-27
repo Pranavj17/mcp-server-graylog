@@ -1,7 +1,7 @@
 {
     "name": "mcp-server-graylog",
-    "version": "1.0.3",
-    "description": "Model Context Protocol (MCP) server for Graylog log searching. Search logs by absolute/relative timestamps, filter by streams, and debug production issues.",
+    "version": "2.0.1",
+    "description": "Model Context Protocol (MCP) server for Graylog log searching with distributed tracing. Search logs, trace requests across services, get surrounding context, and debug production issues.",
     "main": "src/index.js",
     "type": "module",
     "bin": {
@@ -34,7 +34,10 @@
         "elasticsearch",
         "production-debugging",
         "observability",
-        "error-tracking"
+        "error-tracking",
+        "distributed-tracing",
+        "trace-id",
+        "microservices"
     ],
     "author": "Pranav <https://github.com/Pranavj17>",
     "license": "MIT",
