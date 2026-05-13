@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-05-13
+
+### Added
+- **`aggregate_logs` tool** — Count log entries grouped by a field (service, logger_level, pod, lead_id, http_status, container_name, etc.). Issues ONE Graylog search with `fields=<group_field>` projected (bandwidth-light) and aggregates client-side. Returns `{top, other, missing, truncated, unique_groups, total_matched, ...}`. Accepts either `{from, to}` or `rangeSeconds`. Caps at `fetchLimit` messages (default 5000, max 10000) — when matched total exceeds that, `truncated: true` is flagged and the caller is expected to narrow the window.
+
+### Why it's client-side rather than a Graylog aggregation
+Graylog 5.x dropped the legacy `/api/search/universal/{rel,abs}/terms` aggregation endpoints — verified by live-probe against `graylog.scripbox.net` returning 404 for `/terms`, `/stats`, `/histogram`. The Views API replacement is a multi-step search-create + execute + poll dance that's awkward for a single MCP tool call. Client-side aggregation over the legacy search endpoint (which IS still present) works on every Graylog 4.x+ version and stays simple. The `fields=` projection means we only download the column we need, so even at 10000 matches the response payload is small.
+
+### Changed
+- Server version bumped to 2.2.0
+- `server.json` bumped to 1.2.0 (MCP registry · 1.1.1 → 1.2.0 for new tool)
+
+### Notes
+- Listed as planned for 2.2.0 in earlier CHANGELOG — this delivery covers `aggregate_logs`. `list_fields` and TypeScript types remain in the queue for 2.3.
+
 ## [2.1.1] - 2026-05-13
 
 ### Added

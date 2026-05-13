@@ -80,7 +80,7 @@ async function graylogRequest(endpoint, params = {}) {
 
 const server = new Server({
     name: "graylog-mcp",
-    version: "2.1.1",
+    version: "2.2.0",
 }, {
     capabilities: {
         tools: {},
@@ -237,6 +237,50 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
+                name: "aggregate_logs",
+                description: "Count log entries grouped by a field (service, logger_level, pod, lead_id, http_status, container_name, etc.). Fetches matching messages with ONLY the requested field projected (bandwidth-efficient) and aggregates client-side. Common usage: 'errors in last hour grouped by service' → query: 'logger_level:error', field: 'service', rangeSeconds: 3600. When the total matched exceeds `fetchLimit` (default 5000), `truncated: true` is set in the response and the caller should narrow the time window. Provide EITHER from+to OR rangeSeconds, not both.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        query: {
+                            type: "string",
+                            description: "Filter query (Elasticsearch syntax). Use '*' for all entries in the window."
+                        },
+                        field: {
+                            type: "string",
+                            description: "Field to group counts by. Common values: service, logger_level, pod, lead_id, http_status, container_name."
+                        },
+                        from: {
+                            type: "string",
+                            description: "Start ISO 8601 timestamp (use either from+to OR rangeSeconds)"
+                        },
+                        to: {
+                            type: "string",
+                            description: "End ISO 8601 timestamp"
+                        },
+                        rangeSeconds: {
+                            type: "number",
+                            description: "Relative window in seconds (alt to from+to)"
+                        },
+                        size: {
+                            type: "number",
+                            description: "Top N groups to return (default 25, max 100). The rest are summed into `other`.",
+                            default: 25
+                        },
+                        fetchLimit: {
+                            type: "number",
+                            description: "Max messages to fetch and aggregate (default 5000, max 10000). Higher = more accurate counts but slower.",
+                            default: 5000
+                        },
+                        streamId: {
+                            type: "string",
+                            description: "Optional stream filter"
+                        }
+                    },
+                    required: ["query", "field"]
+                }
+            },
+            {
                 name: "analyze_incident",
                 description: "Composite incident analysis. Given a trace_id, this ONE tool call fans out to: (1) the full trace hop chain across services, (2) surrounding logs scoped to the anchor pod for noise-free context around the first error, and (3) a service-level error baseline over the trailing 1h. Returns a single aggregated report with hop count, services involved, anchor service/pod, first-error context, request entry/exit summary (path/method/status/duration), and baseline error rate. Use this instead of orchestrating trace_request + get_surrounding_logs + search_logs manually whenever you need to investigate, root-cause, or analyze a specific trace — saves 2-3 LLM rounds and gives the model one rich result to reason over.",
                 inputSchema: {
@@ -301,6 +345,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
             case "analyze_incident":
                 return await analyzeIncident(args);
+
+            case "aggregate_logs":
+                return await aggregateLogs(args);
 
             default:
                 throw new Error(`Unknown tool: ${name}`);
@@ -553,6 +600,101 @@ async function getSystemInfo() {
         hostname: data.hostname,
         is_processing: data.is_processing,
         timezone: data.timezone
+    };
+
+    return {
+        content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2)
+        }]
+    };
+}
+
+// ============================================================================
+// AGGREGATION TOOL · aggregate_logs
+// ============================================================================
+//
+// Counts log entries grouped by an arbitrary field. Graylog 5.x dropped the
+// legacy `/api/search/universal/{rel,abs}/terms` aggregation endpoints, so
+// we issue a single regular search with `fields=<group_field>` (Graylog
+// projects ONLY that field, dramatically reducing response bandwidth) and
+// then aggregate client-side. For typical workloads this is fast and cheap;
+// for high-cardinality queries above `fetchLimit`, the response flags
+// `truncated: true` and the caller is expected to narrow the window.
+
+async function aggregateLogs(args) {
+    const { from, to, streamId, rangeSeconds } = args;
+    const query = validateQuery(args.query);
+    const field = String(args.field || '').trim();
+    if (!field) {
+        throw new Error("'field' parameter is required and must be a non-empty string");
+    }
+    if (!/^[a-zA-Z_][a-zA-Z0-9_.\-]*$/.test(field)) {
+        // Stops trivially-malformed values; Graylog field names are alnum/_/. only.
+        throw new Error(`'field' contains invalid characters: ${JSON.stringify(field)}`);
+    }
+    const size = Math.min(100, Math.max(1, args.size ?? 25));
+    const fetchLimit = Math.min(10000, Math.max(1, args.fetchLimit ?? 5000));
+    validateStreamId(streamId);
+
+    // Build the fetch params · request ONLY the field of interest (bandwidth saver)
+    let endpoint, params;
+    if (rangeSeconds !== undefined && rangeSeconds !== null) {
+        if (from || to) {
+            throw new Error("Provide EITHER rangeSeconds OR from+to, not both");
+        }
+        const range = validateRangeSeconds(rangeSeconds);
+        endpoint = '/api/search/universal/relative';
+        params = { query, range, limit: fetchLimit, fields: field };
+    } else if (from && to) {
+        validateTimeRange(from, to);
+        endpoint = '/api/search/universal/absolute';
+        params = { query, from: from.trim(), to: to.trim(), limit: fetchLimit, fields: field };
+    } else {
+        throw new Error("Provide EITHER rangeSeconds OR both from+to");
+    }
+    if (streamId) {
+        params.filter = `streams:${streamId}`;
+    }
+
+    const data = await graylogRequest(endpoint, params);
+    const messages = formatMessages(data.messages);
+
+    // Client-side group-by-and-count
+    const counts = {};
+    let missing = 0;
+    for (const m of messages) {
+        const v = m[field];
+        if (v === undefined || v === null || v === '') {
+            missing++;
+            continue;
+        }
+        const key = String(v);
+        counts[key] = (counts[key] || 0) + 1;
+    }
+
+    // Sort descending, split into top-N + summed `other`
+    const sortedEntries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const topN = sortedEntries.slice(0, size);
+    const otherCount = sortedEntries.slice(size).reduce((sum, [, c]) => sum + c, 0);
+
+    const totalMatched = data.total_results || 0;
+    const truncated = messages.length >= fetchLimit && totalMatched > fetchLimit;
+
+    const result = {
+        field,
+        query: data.built_query || query,
+        time_range: (rangeSeconds !== undefined && rangeSeconds !== null)
+            ? `Last ${rangeSeconds} seconds`
+            : { from: from.trim(), to: to.trim() },
+        total_matched: totalMatched,
+        messages_aggregated: messages.length,
+        truncated,                          // true when the matched total exceeded fetchLimit
+        unique_groups: sortedEntries.length,
+        top: Object.fromEntries(topN),      // ordered insertion · top N descending by count
+        other: otherCount,                  // sum of counts beyond top N
+        missing,                            // messages where the requested field was null/empty
+        api_calls: 1
     };
 
     return {

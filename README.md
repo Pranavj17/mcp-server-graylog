@@ -16,6 +16,7 @@ Model Context Protocol (MCP) server for Graylog log searching. Search logs by ab
 - ✅ **Distributed tracing** - Follow a `trace_id` across all services
 - ✅ **Surrounding-log context** - See what happened ±N seconds around an error
 - ✅ **Composite incident analysis** - One tool call fans out to trace + context + baseline
+- ✅ **Field aggregation** - Group counts by service/level/pod/lead_id with bandwidth-efficient projection
 - ✅ **Stream discovery** - List all available streams/applications
 - ✅ **System health check** - Verify Graylog connectivity
 - ✅ **Comprehensive validation** - ISO 8601 timestamps, query syntax, stream IDs
@@ -250,7 +251,48 @@ Internally executes:
 }
 ```
 
-### 6. list_streams
+### 6. aggregate_logs
+
+Count log entries grouped by a field — Graylog's most-used operation, made one-call. Issues a single search with `fields=<group_field>` projected (so only the column you want is downloaded) and aggregates client-side. Replaces Graylog 5.x's removed legacy terms-aggregation endpoint.
+
+**Parameters:**
+- `query` (required): Filter (Elasticsearch syntax). Use `*` for all entries.
+- `field` (required): Field to group by. Common: `service`, `logger_level`, `pod`, `lead_id`, `http_status`, `container_name`.
+- `from`+`to` OR `rangeSeconds` (required, mutually exclusive): time window
+- `size` (optional): Top N to return (default 25, max 100). Rest summed into `other`.
+- `fetchLimit` (optional): Max messages to aggregate (default 5000, max 10000). When matched exceeds this, `truncated: true` is flagged.
+- `streamId` (optional)
+
+**Example:**
+```javascript
+{
+  "query": "logger_level:error",
+  "field": "service",
+  "rangeSeconds": 1800,
+  "size": 10
+}
+```
+
+**Returns:**
+```json
+{
+  "field": "service",
+  "query": "logger_level:error",
+  "time_range": "Last 1800 seconds",
+  "total_matched": 30,
+  "messages_aggregated": 30,
+  "truncated": false,
+  "unique_groups": 5,
+  "top": { "milkyway": 8, "argus": 4, "telex": 4, "advisory": 3, "auth": 1 },
+  "other": 0,
+  "missing": 10,
+  "api_calls": 1
+}
+```
+
+The `missing` count is messages that matched the query but had no value for the group-by field — useful signal for log-hygiene issues.
+
+### 7. list_streams
 
 List all available Graylog streams (applications). Use this to discover stream IDs for filtering.
 
@@ -271,7 +313,7 @@ List all available Graylog streams (applications). Use this to discover stream I
 }
 ```
 
-### 7. get_system_info
+### 8. get_system_info
 
 Get Graylog system information and health status. Verify connectivity and check server version.
 
