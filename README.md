@@ -13,6 +13,9 @@ Model Context Protocol (MCP) server for Graylog log searching. Search logs by ab
 
 - ✅ **Absolute timestamp search** - Debug specific errors with exact time ranges
 - ✅ **Relative timestamp search** - Search recent logs (last N seconds)
+- ✅ **Distributed tracing** - Follow a `trace_id` across all services
+- ✅ **Surrounding-log context** - See what happened ±N seconds around an error
+- ✅ **Composite incident analysis** - One tool call fans out to trace + context + baseline
 - ✅ **Stream discovery** - List all available streams/applications
 - ✅ **System health check** - Verify Graylog connectivity
 - ✅ **Comprehensive validation** - ISO 8601 timestamps, query syntax, stream IDs
@@ -159,7 +162,95 @@ Search logs using relative time range (e.g., last 15 minutes). Useful for recent
 }
 ```
 
-### 3. list_streams
+### 3. trace_request
+
+Trace a request across ALL services using a `trace_id`. Fetches logs from every stream, groups by service/pod, and sorts each service's messages chronologically. Essential for distributed debugging in microservice architectures.
+
+**Parameters:**
+- `traceId` (required): The trace ID to follow (e.g., `abbb27610a7fd76be8fb5af17edbe00d`)
+- `from` (required): Start timestamp in ISO 8601 format (search window)
+- `to` (required): End timestamp in ISO 8601 format (search window)
+- `limit` (optional): Maximum results (default: 200, max: 1000)
+
+**Example:**
+```javascript
+{
+  "traceId": "abbb27610a7fd76be8fb5af17edbe00d",
+  "from": "2026-05-13T15:38:00.000Z",
+  "to":   "2026-05-13T15:48:00.000Z"
+}
+```
+
+### 4. get_surrounding_logs
+
+Return logs within ±N seconds of a timestamp, optionally filtered by source/pod/stream. Reveals what happened immediately before and after an error.
+
+**Parameters:**
+- `timestamp` (required): Center timestamp in ISO 8601 format
+- `source` (optional): Source hostname or pod to filter by
+- `streamId` (optional): Stream ID filter
+- `windowSeconds` (optional): Window on each side (default: 5, max: 300)
+- `limit` (optional): Maximum results (default: 100)
+
+**Example:**
+```javascript
+{
+  "timestamp": "2026-05-13T15:43:27.844Z",
+  "source": "argus-production-f747f5d4d-x9hpp",
+  "windowSeconds": 10
+}
+```
+
+### 5. analyze_incident
+
+**Composite tool.** One call fans out to three searches and returns an aggregated incident report — saves 2-3 LLM orchestration rounds when investigating a specific trace.
+
+Internally executes:
+1. The full trace hop chain (`trace_id:X`)
+2. Pod-scoped surrounding logs around the first ERROR/CRITICAL/FATAL hop (filters by `pod:` to avoid multi-tenant noise on shared hosts)
+3. A trailing-hour error baseline for the anchor service
+
+**Parameters:**
+- `traceId` (required): The trace ID to investigate
+- `from` (required): Start timestamp in ISO 8601 format
+- `to` (required): End timestamp in ISO 8601 format
+- `window` (optional): Surrounding-logs window in seconds (default: 10, max: 300)
+- `baselineSeconds` (optional): Trailing window for the baseline lookup (default: 3600, max: 86400)
+
+**Example:**
+```javascript
+{
+  "traceId": "abbb27610a7fd76be8fb5af17edbe00d",
+  "from": "2026-05-13T15:38:00.000Z",
+  "to":   "2026-05-13T15:48:00.000Z",
+  "window": 10,
+  "baselineSeconds": 3600
+}
+```
+
+**Returns** (abridged):
+```json
+{
+  "trace_id": "abbb27610a7fd76be8fb5af17edbe00d",
+  "found": true,
+  "steps_executed": 4,
+  "summary": {
+    "hops": 4,
+    "services_involved": ["argus"],
+    "errors_in_trace": 1,
+    "anchor_service": "argus",
+    "anchor_pod": "argus-production-f747f5d4d-x9hpp",
+    "first_error": { "timestamp": "...", "service": "argus", "message": "nil fund_id ...", "lead_id": "..." },
+    "request": { "http_path": "/api/v2/user/graph", "http_method": "POST", "http_status": 200, "duration_ms": 67 },
+    "baseline_errors_in_service": 16,
+    "baseline_window_seconds": 3600
+  },
+  "trace_hops": [...],
+  "surrounding_logs": [...]
+}
+```
+
+### 6. list_streams
 
 List all available Graylog streams (applications). Use this to discover stream IDs for filtering.
 
@@ -180,7 +271,7 @@ List all available Graylog streams (applications). Use this to discover stream I
 }
 ```
 
-### 4. get_system_info
+### 7. get_system_info
 
 Get Graylog system information and health status. Verify connectivity and check server version.
 

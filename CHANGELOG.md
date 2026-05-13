@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-05-13
+
+### Added
+- **`analyze_incident` tool** — Composite incident analysis demonstrating the "internal fan-out" MCP pattern. ONE tool call fans out to three sequential Graylog searches: (1) the full trace hop chain via `trace_id:X`, (2) **pod-scoped** surrounding logs around the first ERROR/CRITICAL/FATAL hop (filters by `pod:` instead of `source:` to avoid multi-tenant noise on shared EC2 hosts), and (3) a trailing-hour error baseline for the anchor service. Returns one aggregated report — hops, services involved, anchor service/pod, first-error context, HTTP request entry/exit summary (path/method/status/duration), and baseline error rate. Designed for LLM consumption: saves 2-3 orchestration rounds when investigating a specific trace.
+- New `summary.request` field extracts `http_path`, `http_method`, `http_status`, `duration_ms` from the trace's exit log when present.
+- New `summary.first_error.lead_id` field surfaces the user identifier when Scripbox-style traces carry it.
+
+### Changed
+- Server version bumped to 2.1.0
+- `server.json` registry metadata refreshed to list all 7 tools (was stale — still listed only 4 from v1.x)
+
+### Notes
+- Validated against real Graylog 5.0.3 production data before shipping. Key discoveries that shaped the design: `logger_level` is lowercase in practice (so error-level detection is case-insensitive), and a 10s surrounding-logs window matched 756 logs across 5+ pods on the same EC2 host — driving the pod-scoped filter decision.
+- The previously-planned 2.1.0 features (`aggregate_logs`, `list_fields`) were not built in this release; they remain in the future-releases queue.
+
 ## [2.0.0] - 2026-04-27
 
 ### Breaking Changes
@@ -105,7 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Future Releases
 
-### [2.1.0] - Planned
+### [2.2.0] - Planned
 - `aggregate_logs` tool — Count/group logs by service, level, pod
 - `list_fields` tool — Discover available fields in a stream
 - GitHub Actions CI/CD pipeline

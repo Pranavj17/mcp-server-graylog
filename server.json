@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.Pranavj17/mcp-server-graylog",
-  "version": "1.0.3",
-  "description": "Search Graylog logs by timestamps, filter by streams, and debug production issues.",
+  "version": "1.1.0",
+  "description": "Search Graylog logs by timestamps, filter by streams, trace requests across services, and run composite incident analysis to debug production issues.",
   "homepage": "https://github.com/Pranavj17/mcp-server-graylog",
   "licenseId": "MIT",
   "sourceUrl": "https://github.com/Pranavj17/mcp-server-graylog",
@@ -24,12 +24,24 @@
       "description": "Search Graylog logs using relative time range (e.g., last 15 minutes). Useful for recent log analysis."
     },
     {
+      "name": "trace_request",
+      "description": "Trace a request across all services using a trace_id. Fetches logs from ALL streams, groups by service/pod, and shows the full request lifecycle."
+    },
+    {
+      "name": "get_surrounding_logs",
+      "description": "Get logs surrounding a specific timestamp (+-N seconds) from a specific source or pod. Useful for understanding what happened right before and after an error."
+    },
+    {
       "name": "list_streams",
       "description": "List all available Graylog streams (applications). Use this to discover stream IDs for filtering."
     },
     {
       "name": "get_system_info",
       "description": "Get Graylog system information and health status. Use this to verify connectivity."
+    },
+    {
+      "name": "analyze_incident",
+      "description": "Composite incident analysis. ONE tool call fans out to the full trace hop chain, pod-scoped surrounding logs around the first error, and a trailing-hour error baseline for the anchor service. Saves 2-3 LLM rounds when investigating a specific trace."
     }
   ],
   "keywords": [
