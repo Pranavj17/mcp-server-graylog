@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-05-13
+
+### Added
+- **Structured stderr logging on every tool dispatch**. Three log lines per call:
+  - `[graylog-mcp] tool_call: <name> <args>` — pre-execution, includes redacted args
+  - `[graylog-mcp] tool_done: <name> · <duration>ms` — on success
+  - `[graylog-mcp] tool_error: <name> · <duration>ms { message, args }` — on failure
+- **`redactArgs()` helper** — masks credential-looking keys (regex: `token|password|secret|auth|cred|apikey`) before any args reach stderr; also truncates string values longer than 200 chars to prevent log spam from large Elasticsearch queries.
+- **`dispatchTool()` helper** — extracted the switch statement from the request handler so the logging wrapper stays compact.
+
+### Why
+Before this patch, the only error visible on the server side was HTTP-level failures from `graylogRequest` (already logged). Validation errors, parse errors, and any handler-internal throw were silently caught at the top-level and returned only to the MCP client — making post-hoc debugging from server logs effectively impossible. Now every tool invocation is grep-able with full timing.
+
+### Operator notes
+- Logs go to **stderr** (MCP convention — stdout is reserved for the JSON-RPC protocol). Redirect with `2>>graylog-mcp.log` if you want to persist them.
+- Log volume: ~3 lines per tool call. For a busy session of 100 calls/hour, that's ~300 lines/hour. Trivial.
+- No new dependencies, no schema change, no new tool. Pure observability addition.
+
+### Changed
+- Server version bumped to 2.2.1
+- `server.json` bumped to 1.2.1
+
 ## [2.2.0] - 2026-05-13
 
 ### Added

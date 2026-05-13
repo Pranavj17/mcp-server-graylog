@@ -75,12 +75,43 @@ async function graylogRequest(endpoint, params = {}) {
 }
 
 // ============================================================================
+// OBSERVABILITY HELPERS
+// ============================================================================
+//
+// Structured stderr logging for tool dispatch. Pre/done/error trio gives
+// operators a grep-able audit trail without altering the tool response shape.
+// All logs go to stderr (the MCP convention — stdout is reserved for the
+// JSON-RPC protocol).
+
+const REDACT_KEY_RX = /token|password|secret|auth|cred|apikey/i;
+
+// Sanitize args before logging. Two rules:
+//   1. Keys that look like credentials → [REDACTED] (defensive · current
+//      tools don't accept any, but future-proofs against handlers that do).
+//   2. String values > 200 chars get truncated (prevents stderr spam from
+//      large Elasticsearch queries or message bodies).
+function redactArgs(args) {
+    if (!args || typeof args !== 'object') return args;
+    const out = {};
+    for (const [k, v] of Object.entries(args)) {
+        if (REDACT_KEY_RX.test(k)) {
+            out[k] = '[REDACTED]';
+        } else if (typeof v === 'string' && v.length > 200) {
+            out[k] = v.slice(0, 197) + '...';
+        } else {
+            out[k] = v;
+        }
+    }
+    return out;
+}
+
+// ============================================================================
 // MCP SERVER SETUP
 // ============================================================================
 
 const server = new Server({
     name: "graylog-mcp",
-    version: "2.2.0",
+    version: "2.2.1",
 }, {
     capabilities: {
         tools: {},
@@ -320,39 +351,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 // TOOL IMPLEMENTATIONS
 // ============================================================================
 
+// Dispatch the request to the right handler. Extracted from the request
+// handler so the logging wrapper around it stays compact.
+async function dispatchTool(name, args) {
+    switch (name) {
+        case "search_logs_absolute":  return await searchLogsAbsolute(args);
+        case "search_logs_relative":  return await searchLogsRelative(args);
+        case "trace_request":         return await traceRequest(args);
+        case "get_surrounding_logs":  return await getSurroundingLogs(args);
+        case "list_streams":          return await listStreams();
+        case "get_system_info":       return await getSystemInfo();
+        case "analyze_incident":      return await analyzeIncident(args);
+        case "aggregate_logs":        return await aggregateLogs(args);
+        default:
+            throw new Error(`Unknown tool: ${name}`);
+    }
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    const startMs = Date.now();
+
+    // Pre-call log · grep-able audit trail entry for every invocation.
+    console.error(`[graylog-mcp] tool_call: ${name}`, redactArgs(args));
 
     try {
-        switch (name) {
-            case "search_logs_absolute":
-                return await searchLogsAbsolute(args);
-
-            case "search_logs_relative":
-                return await searchLogsRelative(args);
-
-            case "trace_request":
-                return await traceRequest(args);
-
-            case "get_surrounding_logs":
-                return await getSurroundingLogs(args);
-
-            case "list_streams":
-                return await listStreams();
-
-            case "get_system_info":
-                return await getSystemInfo();
-
-            case "analyze_incident":
-                return await analyzeIncident(args);
-
-            case "aggregate_logs":
-                return await aggregateLogs(args);
-
-            default:
-                throw new Error(`Unknown tool: ${name}`);
-        }
+        const result = await dispatchTool(name, args);
+        // Success log · captures latency for slow-tool diagnosis.
+        console.error(`[graylog-mcp] tool_done: ${name} · ${Date.now() - startMs}ms`);
+        return result;
     } catch (error) {
+        // Error log · structured so operators can correlate failures back to
+        // the calling tool + args without having to read the client response.
+        console.error(`[graylog-mcp] tool_error: ${name} · ${Date.now() - startMs}ms`, {
+            message: error.message,
+            args: redactArgs(args)
+        });
         return {
             content: [{
                 type: "text",
