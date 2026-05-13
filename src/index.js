@@ -80,7 +80,7 @@ async function graylogRequest(endpoint, params = {}) {
 
 const server = new Server({
     name: "graylog-mcp",
-    version: "2.1.0",
+    version: "2.1.1",
 }, {
     capabilities: {
         tools: {},
@@ -612,7 +612,8 @@ async function analyzeIncident(args) {
                     trace_id: tid,
                     found: false,
                     note: `no messages match trace_id "${tid}" between ${from} and ${to}`,
-                    steps_executed: 1
+                    steps_executed: 1,
+                    api_calls: 1   // only step 1 (trace lookup) fires when the trace is empty
                 }, null, 2)
             }]
         };
@@ -673,7 +674,8 @@ async function analyzeIncident(args) {
     const result = {
         trace_id: tid,
         found: true,
-        steps_executed: 4,
+        steps_executed: 4,   // algorithm steps · 4 logical, 3 hit Graylog
+        api_calls: 3,        // actual outbound HTTP requests · step 2 (anchor selection) is in-memory only
         summary: {
             hops: traceHops.length,
             services_involved,

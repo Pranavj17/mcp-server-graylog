@@ -1,6 +1,6 @@
 {
     "name": "mcp-server-graylog",
-    "version": "2.1.0",
+    "version": "2.1.1",
     "description": "Model Context Protocol (MCP) server for Graylog log searching with distributed tracing. Search logs, trace requests across services, get surrounding context, and debug production issues.",
     "main": "src/index.js",
     "type": "module",

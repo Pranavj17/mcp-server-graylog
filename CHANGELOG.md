@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-05-13
+
+### Added
+- **`api_calls` field on `analyze_incident` responses** — explicit count of outbound HTTP requests to Graylog (3 on the happy path, 1 when the trace is empty). Sits alongside `steps_executed`, which counts the algorithm's logical steps (4 — includes the in-memory anchor-selection step that doesn't hit the network). The old field was easy to misread as "API calls"; this disambiguates without breaking consumers that already read `steps_executed`.
+
+### Changed
+- Server version bumped to 2.1.1
+- `server.json` bumped to 1.1.1
+
+### Why
+- Originated in a live demo: after watching the v2.1.0 tool run through an HTTP proxy that captured exactly 3 outbound Graylog requests, it was obvious that the `steps_executed: 4` field was misleading by exactly one. Patch keeps the old field for backwards compat and adds the unambiguous one.
+
 ## [2.1.0] - 2026-05-13
 
 ### Added

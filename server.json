@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.Pranavj17/mcp-server-graylog",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Search Graylog logs by timestamps, filter by streams, trace requests across services, and run composite incident analysis to debug production issues.",
   "homepage": "https://github.com/Pranavj17/mcp-server-graylog",
   "licenseId": "MIT",
