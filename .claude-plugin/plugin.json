@@ -1,0 +1,14 @@
+{
+  "name": "graylog",
+  "description": "Graylog MCP server — search logs by timestamp/stream, trace requests across services, pull surrounding-context logs, and run composite incident analysis for production debugging.",
+  "version": "2.2.1",
+  "author": {
+    "name": "Pranav",
+    "url": "https://github.com/Pranavj17"
+  },
+  "homepage": "https://github.com/Pranavj17/mcp-server-graylog",
+  "repository": "https://github.com/Pranavj17/mcp-server-graylog",
+  "license": "MIT",
+  "keywords": ["graylog", "logging", "log-search", "observability", "distributed-tracing", "mcp"],
+  "mcpServers": "./.mcp.json"
+}

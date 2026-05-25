@@ -1,0 +1,19 @@
+{
+  "name": "pranavj17",
+  "owner": {
+    "name": "Pranav",
+    "url": "https://github.com/Pranavj17"
+  },
+  "metadata": {
+    "description": "Pranav's personal Claude Code plugins.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "graylog",
+      "source": "./",
+      "description": "Graylog MCP server: log search, distributed tracing, surrounding-context lookups, and composite incident analysis.",
+      "category": "observability"
+    }
+  ]
+}

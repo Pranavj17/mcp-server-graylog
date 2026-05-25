@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "graylog": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-graylog"],
+      "env": {
+        "BASE_URL": "${GRAYLOG_BASE_URL}",
+        "API_TOKEN": "${GRAYLOG_API_TOKEN}"
+      }
+    }
+  }
+}
