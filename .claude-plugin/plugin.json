@@ -1,5 +1,6 @@
 {
-  "name": "graylog",
+  "name": "graylog-log-search",
+  "displayName": "Graylog Log Search",
   "description": "Graylog MCP server — search logs by timestamp/stream, trace requests across services, pull surrounding-context logs, and run composite incident analysis for production debugging.",
   "version": "2.2.1",
   "author": {
