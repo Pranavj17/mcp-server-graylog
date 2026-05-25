@@ -11,7 +11,6 @@
   "plugins": [
     {
       "name": "graylog-log-search",
-      "displayName": "Graylog Log Search",
       "source": "./",
       "description": "Graylog MCP server: log search, distributed tracing, surrounding-context lookups, and composite incident analysis.",
       "category": "observability"
