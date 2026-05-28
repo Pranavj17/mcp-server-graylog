@@ -29,6 +29,7 @@ Model Context Protocol (MCP) server for Graylog log searching. Search logs by ab
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Available Tools](#available-tools)
+- [Skills & agents](#skills--agents-v230)
 - [Query Examples](#query-examples)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
@@ -329,6 +330,27 @@ Get Graylog system information and health status. Verify connectivity and check 
   "timezone": "UTC"
 }
 ```
+
+## Skills & agents (v2.3.0+)
+
+When installed as a Claude Code plugin, this package ships playbooks that teach Claude *when* and *how* to use the MCP tools above.
+
+### Skills
+
+| Skill | When it triggers | What it does |
+|---|---|---|
+| `graylog` | "search logs", "check graylog", general log questions | Entry-point. Maps common questions to the right tool, explains streams / trace_id / query syntax, points at the specialty skills. |
+| `trace-debugging` | "trace_id", "follow this request", "distributed trace" | Single-request investigation across services. Pulls the trace, finds error spans, gathers surrounding context, synthesizes a timeline. |
+| `incident-triage` | "errors spiking", "outage", "alert fired" | Localizes an active incident to a service + pattern. Aggregates errors by service, baselines against previous window, drills into the top offender, checks for deploy correlation. |
+| `troubleshooting` | Graylog tool failures (401, connection refused, empty results) | Diagnoses connectivity, auth, query syntax. Always starts with `get_system_info`. |
+
+### Agent
+
+| Agent | When to dispatch | What it returns |
+|---|---|---|
+| `graylog-trace-analyzer` | Trace investigations expected to surface >200 log lines or span >5 services | A structured timeline (≤50 entries) plus origin, propagation, root-cause line, and a 2–4 sentence verdict. Keeps raw logs out of the parent context. |
+
+Skills auto-load when the plugin is installed. The agent is dispatchable via Claude Code's subagent mechanism with `subagent_type: "graylog-trace-analyzer"`.
 
 ## Query Examples
 

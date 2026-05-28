@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-05-29
+
+### Added
+
+- 4 skills (`graylog`, `trace-debugging`, `incident-triage`, `troubleshooting`) auto-loaded from `skills/`.
+- 1 subagent (`graylog-trace-analyzer`) auto-loaded from `agents/` — dispatch for trace investigations expected to surface >200 log lines or span >5 services.
+- README "Skills & agents" section documenting triggers and use cases.
+
+### Changed
+
+- None. No `src/` modifications; the MCP server runtime is unchanged from 2.2.1.
+
 ## [2.2.1] - 2026-05-13
 
 ### Added
