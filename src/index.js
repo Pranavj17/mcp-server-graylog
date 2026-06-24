@@ -21,7 +21,7 @@ import {
     validateLimit,
     formatError,
     formatMessages,
-    DEFAULT_FIELDS
+    parseViewsResult
 } from "./helpers.js";
 
 // ============================================================================
@@ -72,6 +72,69 @@ async function graylogRequest(endpoint, params = {}) {
         });
         throw new Error(formatError(error, CONFIG.baseUrl));
     }
+}
+
+// POST helper for the modern Views Search API. Graylog requires the
+// `X-Requested-By` header on POSTs (CSRF guard); same token auth as GETs.
+async function graylogPost(endpoint, body) {
+    try {
+        const response = await axios.post(`${CONFIG.baseUrl}${endpoint}`, body, {
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-By': 'graylog-mcp'
+            },
+            auth: { username: CONFIG.apiToken, password: 'token' },
+            timeout: CONFIG.timeout
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`[graylog-mcp] Error: ${endpoint}`, {
+            status: error.response?.status,
+            message: error.message
+        });
+        throw new Error(formatError(error, CONFIG.baseUrl));
+    }
+}
+
+// Build a Views Search request for a single message-list query.
+//   timerange: { type: 'relative', range: <seconds> }
+//            | { type: 'absolute', from: <ISO>, to: <ISO> }
+//   sort: 'asc' | 'desc' (default 'desc' — newest first, matching the old API)
+function buildSearchRequest({ query, timerange, limit, streamId, sort }) {
+    const searchType = {
+        id: 'st1',
+        type: 'messages',
+        limit,
+        offset: 0,
+        sort: [{ field: 'timestamp', order: sort === 'asc' ? 'ASC' : 'DESC' }]
+    };
+    if (streamId) {
+        searchType.streams = [streamId];
+    }
+    return {
+        queries: [{
+            id: 'q1',
+            query: { type: 'elasticsearch', query_string: query },
+            timerange,
+            search_types: [searchType]
+        }]
+    };
+}
+
+// Run a search via the modern Views Search API (create → execute) and return
+// the universal-compatible shape { total_results, built_query, messages } that
+// the tool handlers + formatMessages already consume. Replaces the deprecated
+// /api/search/universal/{relative,absolute} endpoints, which on Graylog 5.x
+// fail cryptically ("Missing search type result!") on multi-term/OR queries.
+async function viewsSearch(opts) {
+    const created = await graylogPost('/api/views/search', buildSearchRequest(opts));
+    const searchId = created && created.id;
+    if (!searchId) {
+        throw new Error('Graylog did not return a search id from /api/views/search');
+    }
+    const exec = await graylogPost(`/api/views/search/${searchId}/execute`, {});
+    return parseViewsResult(exec, opts.query);
 }
 
 // ============================================================================
@@ -408,27 +471,15 @@ async function searchLogsAbsolute(args) {
     validateTimeRange(from, to);
     validateStreamId(streamId);
 
-    // Use caller-specified fields, or default set that includes tracing fields
-    const fields = args.fields === '*' ? undefined : (args.fields || DEFAULT_FIELDS);
-
-    // Build request parameters
-    const params = {
+    // Execute search via the Views Search API (returns all message fields;
+    // formatMessages strips gl2_* noise). The legacy `fields` projection is no
+    // longer needed — the message list already carries the tracing fields.
+    const data = await viewsSearch({
         query,
-        from: from.trim(),
-        to: to.trim(),
-        limit
-    };
-
-    if (fields) {
-        params.fields = fields;
-    }
-
-    if (streamId) {
-        params.filter = `streams:${streamId}`;
-    }
-
-    // Execute search
-    const data = await graylogRequest('/api/search/universal/absolute', params);
+        timerange: { type: 'absolute', from: from.trim(), to: to.trim() },
+        limit,
+        streamId
+    });
 
     // Format response
     const result = {
@@ -453,26 +504,13 @@ async function searchLogsRelative(args) {
     const limit = validateLimit(args.limit);
     validateStreamId(streamId);
 
-    // Use caller-specified fields, or default set that includes tracing fields
-    const fields = args.fields === '*' ? undefined : (args.fields || DEFAULT_FIELDS);
-
-    // Build request parameters
-    const params = {
+    // Execute search via the Views Search API (see searchLogsAbsolute note).
+    const data = await viewsSearch({
         query,
-        range: rangeSeconds,
-        limit
-    };
-
-    if (fields) {
-        params.fields = fields;
-    }
-
-    if (streamId) {
-        params.filter = `streams:${streamId}`;
-    }
-
-    // Execute search
-    const data = await graylogRequest('/api/search/universal/relative', params);
+        timerange: { type: 'relative', range: rangeSeconds },
+        limit,
+        streamId
+    });
 
     // Format response
     const result = {
@@ -500,14 +538,11 @@ async function traceRequest(args) {
     }
 
     // Search across ALL streams (no filter) for this trace_id
-    const params = {
+    const data = await viewsSearch({
         query: `trace_id:${traceId.trim()}`,
-        from: from.trim(),
-        to: to.trim(),
+        timerange: { type: 'absolute', from: from.trim(), to: to.trim() },
         limit
-    };
-
-    const data = await graylogRequest('/api/search/universal/absolute', params);
+    });
     const messages = formatMessages(data.messages);
 
     // Group messages by service/source for easier reading
@@ -567,19 +602,13 @@ async function getSurroundingLogs(args) {
         query = `source:${source.trim()}`;
     }
 
-    const params = {
+    const data = await viewsSearch({
         query,
-        from,
-        to,
+        timerange: { type: 'absolute', from, to },
         limit,
-        sort: 'timestamp:asc'
-    };
-
-    if (streamId) {
-        params.filter = `streams:${streamId}`;
-    }
-
-    const data = await graylogRequest('/api/search/universal/absolute', params);
+        streamId,
+        sort: 'asc'
+    });
 
     const result = {
         center_timestamp: timestamp,
@@ -671,27 +700,23 @@ async function aggregateLogs(args) {
     const fetchLimit = Math.min(10000, Math.max(1, args.fetchLimit ?? 5000));
     validateStreamId(streamId);
 
-    // Build the fetch params · request ONLY the field of interest (bandwidth saver)
-    let endpoint, params;
+    // Fetch matching messages, then aggregate client-side. (The Views Search API
+    // returns full messages — the old per-field projection is gone — but the
+    // group-by below only reads `field`, so the result is identical.)
+    let timerange;
     if (rangeSeconds !== undefined && rangeSeconds !== null) {
         if (from || to) {
             throw new Error("Provide EITHER rangeSeconds OR from+to, not both");
         }
-        const range = validateRangeSeconds(rangeSeconds);
-        endpoint = '/api/search/universal/relative';
-        params = { query, range, limit: fetchLimit, fields: field };
+        timerange = { type: 'relative', range: validateRangeSeconds(rangeSeconds) };
     } else if (from && to) {
         validateTimeRange(from, to);
-        endpoint = '/api/search/universal/absolute';
-        params = { query, from: from.trim(), to: to.trim(), limit: fetchLimit, fields: field };
+        timerange = { type: 'absolute', from: from.trim(), to: to.trim() };
     } else {
         throw new Error("Provide EITHER rangeSeconds OR both from+to");
     }
-    if (streamId) {
-        params.filter = `streams:${streamId}`;
-    }
 
-    const data = await graylogRequest(endpoint, params);
+    const data = await viewsSearch({ query, timerange, limit: fetchLimit, streamId });
     const messages = formatMessages(data.messages);
 
     // Client-side group-by-and-count
@@ -771,10 +796,9 @@ async function analyzeIncident(args) {
     const tid = traceId.trim();
 
     // Step 1 · fetch the full trace hop chain
-    const traceData = await graylogRequest('/api/search/universal/absolute', {
+    const traceData = await viewsSearch({
         query: `trace_id:${tid}`,
-        from: from.trim(),
-        to: to.trim(),
+        timerange: { type: 'absolute', from: from.trim(), to: to.trim() },
         limit: 500
     });
     const traceHops = formatMessages(traceData.messages)
@@ -809,12 +833,15 @@ async function analyzeIncident(args) {
     // Real production hosts run many pods on one EC2 instance; filtering by
     // pod (not source) keeps the context focused on the affected container.
     const centerMs = new Date(anchorTs).getTime();
-    const surroundingData = await graylogRequest('/api/search/universal/absolute', {
+    const surroundingData = await viewsSearch({
         query: anchorPod ? `pod:${anchorPod}` : '*',
-        from: new Date(centerMs - window * 1000).toISOString(),
-        to: new Date(centerMs + window * 1000).toISOString(),
+        timerange: {
+            type: 'absolute',
+            from: new Date(centerMs - window * 1000).toISOString(),
+            to: new Date(centerMs + window * 1000).toISOString()
+        },
         limit: 100,
-        sort: 'timestamp:asc'
+        sort: 'asc'
     });
     const surroundingLogs = formatMessages(surroundingData.messages);
 
@@ -822,10 +849,13 @@ async function analyzeIncident(args) {
     // Compares the trace's error against recent prior load — "is this a one-off
     // or is the service already on fire?"
     const traceStartMs = new Date(from.trim()).getTime();
-    const baselineData = await graylogRequest('/api/search/universal/absolute', {
+    const baselineData = await viewsSearch({
         query: `logger_level:error AND service:${anchorService}`,
-        from: new Date(traceStartMs - baselineSeconds * 1000).toISOString(),
-        to: from.trim(),
+        timerange: {
+            type: 'absolute',
+            from: new Date(traceStartMs - baselineSeconds * 1000).toISOString(),
+            to: from.trim()
+        },
         limit: 1
     });
 
