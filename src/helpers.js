@@ -109,6 +109,71 @@ export function formatMessages(messages) {
         });
 }
 
+// ============================================================================
+// VIEWS SEARCH API (Graylog 5.x) RESULT PARSING
+// ============================================================================
+//
+// The modern /api/views/search execute response nests results under
+// results.<queryId>.search_types.<searchTypeId>. It reports backend failures
+// in `errors` (top-level or per-query) with `execution.completed_exceptionally`,
+// instead of the legacy universal endpoint's cryptic "Missing search type
+// result!". We translate the most common one — OpenSearch's boolean
+// maxClauseCount limit, hit by broad/unqualified multi-term queries — into
+// actionable guidance.
+
+function describeViewsErrors(errors) {
+    const descs = errors
+        .map(e => (e && (e.description || e.message)) || (typeof e === 'string' ? e : JSON.stringify(e)))
+        .filter(Boolean);
+    const joined = descs.join(' | ');
+    if (/too_many_nested_clauses|maxClauseCount|max_clause_count/i.test(joined)) {
+        return (
+            'Query too broad for this Graylog/OpenSearch backend — it hit the boolean ' +
+            'maxClauseCount limit (commonly 1024). An unqualified multi-term query ' +
+            '(e.g. "error OR warn") or a wildcard combined with several terms expands ' +
+            'past the limit. Narrow it: qualify terms with a field (logger_level:error, ' +
+            'source:helixa-*), avoid combining a wildcard with multiple unqualified ' +
+            'terms, or raise indices.query.bool.max_clause_count on the OpenSearch ' +
+            'cluster. Raw: ' + joined
+        );
+    }
+    return 'Graylog search error: ' + joined;
+}
+
+// Parse a /api/views/search/{id}/execute response into the universal-compatible
+// shape the tool handlers expect: { total_results, built_query, messages }.
+// `messages` keeps the [{ message: {...} }] shape so formatMessages works
+// unchanged. Throws a clear Error on any backend failure.
+export function parseViewsResult(execData, queryString) {
+    const data = execData || {};
+    const topErrors = Array.isArray(data.errors) ? data.errors : [];
+    const results = data.results || {};
+    const queryResult = Object.values(results)[0] || {};
+    const queryErrors = Array.isArray(queryResult.errors) ? queryResult.errors : [];
+    const allErrors = [...topErrors, ...queryErrors];
+    if (allErrors.length > 0) {
+        throw new Error(describeViewsErrors(allErrors));
+    }
+
+    const searchTypes = queryResult.search_types || {};
+    const searchType = Object.values(searchTypes)[0];
+    if (!searchType) {
+        if (data.execution && data.execution.completed_exceptionally) {
+            throw new Error(
+                'Graylog search completed exceptionally with no error detail — the query ' +
+                'is likely too broad or malformed. Try narrowing it (qualify terms with a field).'
+            );
+        }
+        throw new Error('Graylog returned no search-type result.');
+    }
+
+    return {
+        total_results: searchType.total_results || 0,
+        built_query: queryString,
+        messages: searchType.messages || [],
+    };
+}
+
 // Default fields that cover most debugging scenarios.
 // Users can override via the `fields` parameter on search tools.
 export const DEFAULT_FIELDS = [
