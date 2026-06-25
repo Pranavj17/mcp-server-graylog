@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.Pranavj17/mcp-server-graylog",
-  "version": "1.2.1",
+  "version": "2.4.0",
   "description": "Search Graylog logs by timestamps, filter by streams, trace requests across services, and run composite incident analysis to debug production issues.",
   "homepage": "https://github.com/Pranavj17/mcp-server-graylog",
   "licenseId": "MIT",
@@ -45,7 +45,7 @@
     },
     {
       "name": "aggregate_logs",
-      "description": "Count log entries grouped by a field (service, logger_level, pod, lead_id, etc.). Bandwidth-efficient: fetches only the requested field, aggregates client-side. Common usage: 'errors in last hour grouped by service'. Replaces the legacy Graylog terms endpoint that 5.x dropped."
+      "description": "Count log entries grouped by a field (service, logger_level, pod, lead_id, etc.). Fetches matching messages and aggregates client-side. Common usage: 'errors in last hour grouped by service'. Replaces the legacy Graylog terms endpoint that 5.x dropped."
     }
   ],
   "keywords": [

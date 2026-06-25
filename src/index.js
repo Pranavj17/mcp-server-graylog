@@ -332,7 +332,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "aggregate_logs",
-                description: "Count log entries grouped by a field (service, logger_level, pod, lead_id, http_status, container_name, etc.). Fetches matching messages with ONLY the requested field projected (bandwidth-efficient) and aggregates client-side. Common usage: 'errors in last hour grouped by service' → query: 'logger_level:error', field: 'service', rangeSeconds: 3600. When the total matched exceeds `fetchLimit` (default 5000), `truncated: true` is set in the response and the caller should narrow the time window. Provide EITHER from+to OR rangeSeconds, not both.",
+                description: "Count log entries grouped by a field (service, logger_level, pod, lead_id, http_status, container_name, etc.). Fetches matching messages and aggregates client-side. Common usage: 'errors in last hour grouped by service' → query: 'logger_level:error', field: 'service', rangeSeconds: 3600. When the total matched exceeds `fetchLimit` (default 5000), `truncated: true` is set in the response and the caller should narrow the time window. Provide EITHER from+to OR rangeSeconds, not both.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -678,12 +678,12 @@ async function getSystemInfo() {
 // ============================================================================
 //
 // Counts log entries grouped by an arbitrary field. Graylog 5.x dropped the
-// legacy `/api/search/universal/{rel,abs}/terms` aggregation endpoints, so
-// we issue a single regular search with `fields=<group_field>` (Graylog
-// projects ONLY that field, dramatically reducing response bandwidth) and
-// then aggregate client-side. For typical workloads this is fast and cheap;
-// for high-cardinality queries above `fetchLimit`, the response flags
-// `truncated: true` and the caller is expected to narrow the window.
+// legacy `/api/search/universal/{rel,abs}/terms` aggregation endpoints, so we
+// run a single Views search and aggregate client-side. (The Views Search API
+// migration removed the old per-field projection — we now fetch full messages
+// — but the group-by reads only the requested field, so the result is
+// identical.) For high-cardinality queries above `fetchLimit`, the response
+// flags `truncated: true` and the caller is expected to narrow the window.
 
 async function aggregateLogs(args) {
     const { from, to, streamId, rangeSeconds } = args;

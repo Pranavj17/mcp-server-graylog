@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-06-25
+
+### Changed
+
+- **Migrated all log search from Graylog's deprecated `/api/search/universal/{relative,absolute}` endpoints to the modern Views Search API** (`POST /api/views/search` → `POST /{id}/execute`). On Graylog 5.x the legacy endpoints fail cryptically with `Missing search type result!` on multi-term / OR queries; the Views API is the supported path and surfaces the real backend error.
+- Backend search failures are now reported clearly. The common OpenSearch boolean `maxClauseCount` limit (hit by broad / unqualified multi-term queries) is translated into actionable guidance instead of an opaque error.
+- `aggregate_logs` no longer relies on per-field projection (the Views message list returns full messages); it still aggregates client-side on the requested field, so results are unchanged.
+
+### Notes
+
+- POST requests now send the `X-Requested-By` header (Graylog CSRF guard).
+- Making broad / OR queries actually *return results* (rather than erroring clearly) still requires raising `indices.query.bool.max_clause_count` on the OpenSearch cluster — a server-side change outside this package.
+
 ## [2.3.0] - 2026-05-29
 
 ### Added
